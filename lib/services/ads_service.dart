@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_mobile_ads/google_mobile_ads.dart' hide AppState;
 
@@ -9,7 +11,9 @@ class AdsService {
   /// معرّف وحدة البانر الاختبارية
   static const String testBannerUnitId = 'ca-app-pub-3940256099942544/6300978111';
 
-  static bool get supported => !kIsWeb;
+  /// معطّلة على الويب وفي اختبارات flutter test (لا قناة منصة هناك)
+  static bool get supported =>
+      !kIsWeb && Platform.environment['FLUTTER_TEST'] != 'true';
 
   static Future<void> init() async {
     if (!supported) return;
