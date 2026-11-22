@@ -158,8 +158,6 @@ class LocalStore {
     final d = await db;
     await d.insert('services', s.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
   }
-}
-
   Future<List<Appointment>> appointmentsFor(String date) async {
     final d = await db;
     final rows = await d.query('appointments',
@@ -181,3 +179,4 @@ class LocalStore {
     final d = await db;
     await d.delete('appointments', where: 'id = ?', whereArgs: [id]);
   }
+}
