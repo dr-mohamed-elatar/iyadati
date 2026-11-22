@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import 'config/specialties.dart';
 import 'models/models.dart';
+import 'services/ads_service.dart';
 import 'services/auth_service.dart';
 import 'services/local_store.dart';
 import 'ui/screens/home_shell.dart';
@@ -11,6 +12,7 @@ import 'ui/screens/registration_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AdsService.init();
   await LocalStore.instance.db;
   final profile = await LocalStore.instance.profile();
   runApp(IyadatiApp(profile: profile, auth: LocalAuthService()));
