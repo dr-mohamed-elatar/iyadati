@@ -18,6 +18,9 @@ class LocalStore {
   /// للاختبارات فقط: مسار مخصص (مثل inMemoryDatabasePath)
   static String? debugDbPath;
 
+  /// خطاف الحذف: تسجّله المزامنة السحابية لرفع شواهد الحذف (tombstones)
+  static void Function(String table, String id)? onDelete;
+
   Future<Database> get db async => _db ??= await _open();
 
   Future<Database> _open() async {
@@ -109,6 +112,7 @@ class LocalStore {
   }
 
   Future<void> deletePatient(String id) async {
+    onDelete?.call('patients', id);
     final d = await db;
     final b = d.batch();
     b.delete('patients', where: 'id = ?', whereArgs: [id]);
@@ -176,6 +180,7 @@ class LocalStore {
   }
 
   Future<void> deleteAppointment(String id) async {
+    onDelete?.call('appointments', id);
     final d = await db;
     await d.delete('appointments', where: 'id = ?', whereArgs: [id]);
   }
@@ -195,6 +200,7 @@ class LocalStore {
   }
 
   Future<void> deleteService(String id) async {
+    onDelete?.call('services', id);
     final d = await db;
     await d.delete('services', where: 'id = ?', whereArgs: [id]);
   }
