@@ -179,4 +179,32 @@ class LocalStore {
     final d = await db;
     await d.delete('appointments', where: 'id = ?', whereArgs: [id]);
   }
+
+  Future<void> seedServices(List<String> names) async {
+    final existing = await services();
+    final have = existing.map((e) => e.name).toSet();
+    final d = await db;
+    final b = d.batch();
+    for (final n in names) {
+      if (!have.contains(n)) {
+        b.insert('services', {'id': 'svc_${have.length}_${n.hashCode}', 'name': n, 'price': 0});
+        have.add(n);
+      }
+    }
+    await b.commit(noResult: true);
+  }
+
+  Future<void> deleteService(String id) async {
+    final d = await db;
+    await d.delete('services', where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// ملخص اليوم: عدد الزيارات المكتملة وإجمالي المحصّل
+  Future<({int visits, double income})> daySummary(String date) async {
+    final d = await db;
+    final r = await d.rawQuery(
+        "SELECT COUNT(*) c, COALESCE(SUM(fee),0) s FROM appointments WHERE date = ? AND status = 'تم'",
+        [date]);
+    return (visits: r.first['c'] as int, income: (r.first['s'] as num).toDouble());
+  }
 }

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../main.dart';
 import 'appointments_screen.dart';
+import 'finance_screen.dart';
 import 'patients_screen.dart';
 import 'placeholder_screens.dart';
 
@@ -24,7 +25,7 @@ class _HomeShellState extends State<HomeShell> {
     final screens = [
       const PatientsScreen(),
       AppointmentsScreen(key: _apptKey),
-      PlaceholderScreen(title: 'المال والخدمات', icon: Icons.payments, tips: spec.tips),
+      const FinanceScreen(),
       PlaceholderScreen(title: 'الفريق والمخزون', icon: Icons.groups, tips: spec.tips),
       PlaceholderScreen(title: 'النظام', icon: Icons.settings, tips: spec.tips),
     ];
@@ -40,7 +41,7 @@ class _HomeShellState extends State<HomeShell> {
         ]),
       ),
       body: screens[_index],
-      floatingActionButton: _index == 1 ? AppointmentsFab(stateKey: _apptKey) : null,
+      floatingActionButton: _index == 1 ? AppointmentsFab(stateKey: _apptKey) : null, // المال له FAB خاص
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),

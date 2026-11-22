@@ -125,4 +125,24 @@ void main() {
     final other = await LocalStore.instance.appointmentsFor('2026-01-01');
     expect(other, isEmpty);
   });
+
+  test('المال: ملخص اليوم يجمع رسوم المواعيد المكتملة فقط', () async {
+    final now = DateTime.now();
+    final d =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    await LocalStore.instance.upsertAppointment(Appointment(
+        id: 'f1', patientId: '', patientName: 'أ', date: d, time: '10:00', status: 'تم', fee: 200));
+    await LocalStore.instance.upsertAppointment(Appointment(
+        id: 'f2', patientId: '', patientName: 'ب', date: d, time: '11:00', status: 'مجدول', fee: 500));
+    await LocalStore.instance.upsertAppointment(Appointment(
+        id: 'f3', patientId: '', patientName: 'ج', date: d, time: '12:00', status: 'تم', fee: 150));
+    final sum = await LocalStore.instance.daySummary(d);
+    expect(sum.visits, 2);
+    expect(sum.income, 350);
+    // خدمات التخصص تُزرع مرة واحدة دون تكرار
+    await LocalStore.instance.seedServices(['كشف', 'متابعة']);
+    await LocalStore.instance.seedServices(['كشف', 'متابعة']);
+    final svcs = await LocalStore.instance.services();
+    expect(svcs.where((x) => x.name == 'كشف').length, 1);
+  });
 }
