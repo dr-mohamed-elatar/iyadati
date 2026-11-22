@@ -5,6 +5,7 @@ import 'package:iyadati_app/main.dart';
 import 'package:iyadati_app/models/models.dart';
 import 'package:iyadati_app/services/auth_service.dart';
 import 'package:iyadati_app/services/local_store.dart';
+import 'package:iyadati_app/ui/screens/home_shell.dart';
 import 'package:iyadati_app/ui/screens/patients_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -87,5 +88,51 @@ void main() {
     final iop = eye.measurements.firstWhere((m) => m.name == 'ضغط العين');
     expect(iop.min, 3);
     expect(iop.max, 80);
+  });
+
+  testWidgets('المواعيد: إضافة موعد اليوم وظهوره وتغيير حالته إلى تم', (tester) async {
+    final profile = ClinicProfile(specKey: 'uyoun', doctorName: 'دكتور أحمد', fee: 300);
+    await tester.pumpWidget(ChangeNotifierProvider(
+      create: (_) => AppState(profile),
+      child: const MaterialApp(home: HomeShell()),
+    ));
+    await tester.pumpAndSettle();
+
+    // افتح تبويب المواعيد وأضف موعدًا
+    await tester.tap(find.text('المواعيد'));
+    await tester.pumpAndSettle();
+    expect(find.text('لا مواعيد في هذا اليوم'), findsOneWidget);
+
+    final now = DateTime.now();
+    final dateStr =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    await LocalStore.instance.upsertAppointment(Appointment(
+      id: 'a1', patientId: 'p1', patientName: 'منى أحمد',
+      date: dateStr, time: '18:30', type: 'كشف جديد', fee: 300,
+    ));
+    // إعادة التحميل بإعادة فتح التبويب
+    await tester.tap(find.text('المرضى'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('المواعيد'));
+    for (var i = 0; i < 40; i++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await tester.pump();
+      if (find.text('منى أحمد').evaluate().isNotEmpty) break;
+    }
+
+    expect(find.text('منى أحمد'), findsOneWidget);
+    expect(find.textContaining('كشف جديد'), findsOneWidget);
+    expect(find.text('مجدول'), findsOneWidget);
+
+    // غيّر الحالة إلى تم
+    await tester.tap(find.text('مجدول'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('تم').last);
+    for (var i = 0; i < 40; i++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await tester.pump();
+      if (find.text('تم').evaluate().isNotEmpty) break;
+    }
+    expect(find.text('تم'), findsWidgets);
   });
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../main.dart';
+import 'appointments_screen.dart';
 import 'patients_screen.dart';
 import 'placeholder_screens.dart';
 
@@ -14,6 +15,7 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
+  final _apptKey = GlobalKey<AppointmentsScreenState>();
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +23,7 @@ class _HomeShellState extends State<HomeShell> {
     final spec = app.specialty!;
     final screens = [
       const PatientsScreen(),
-      PlaceholderScreen(title: 'المواعيد', icon: Icons.calendar_month, tips: spec.tips),
+      AppointmentsScreen(key: _apptKey),
       PlaceholderScreen(title: 'المال والخدمات', icon: Icons.payments, tips: spec.tips),
       PlaceholderScreen(title: 'الفريق والمخزون', icon: Icons.groups, tips: spec.tips),
       PlaceholderScreen(title: 'النظام', icon: Icons.settings, tips: spec.tips),
@@ -38,6 +40,7 @@ class _HomeShellState extends State<HomeShell> {
         ]),
       ),
       body: screens[_index],
+      floatingActionButton: _index == 1 ? AppointmentsFab(stateKey: _apptKey) : null,
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),

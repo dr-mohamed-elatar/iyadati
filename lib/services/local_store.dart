@@ -40,7 +40,7 @@ class LocalStore {
       path = p.join((await getApplicationDocumentsDirectory()).path, 'iyadati.db');
     }
     return factory.openDatabase(path,
-        options: OpenDatabaseOptions(version: 1, onCreate: (d, v) async {
+        options: OpenDatabaseOptions(version: 2, onUpgrade: (d, o, n) async { if (o < 2) { await d.execute('''CREATE TABLE IF NOT EXISTS appointments(id TEXT PRIMARY KEY, patient_id TEXT DEFAULT '', patient_name TEXT DEFAULT '', date TEXT NOT NULL, time TEXT DEFAULT '', type TEXT DEFAULT '', status TEXT DEFAULT 'مجدول', note TEXT DEFAULT '', fee REAL DEFAULT 0)'''); await d.execute('CREATE INDEX IF NOT EXISTS idx_appt_date ON appointments(date)'); } }, onCreate: (d, v) async {
           await d.execute('''CREATE TABLE patients(
             id TEXT PRIMARY KEY, name TEXT NOT NULL, phone TEXT DEFAULT '',
             national_id TEXT DEFAULT '', age INTEGER, gender TEXT DEFAULT '',
@@ -57,6 +57,11 @@ class LocalStore {
           await d.execute('''CREATE TABLE services(
             id TEXT PRIMARY KEY, name TEXT NOT NULL, price REAL DEFAULT 0)''');
           await d.execute('''CREATE TABLE kv(key TEXT PRIMARY KEY, value TEXT)''');
+          await d.execute('''CREATE TABLE appointments(
+            id TEXT PRIMARY KEY, patient_id TEXT DEFAULT '', patient_name TEXT DEFAULT '',
+            date TEXT NOT NULL, time TEXT DEFAULT '', type TEXT DEFAULT '',
+            status TEXT DEFAULT 'مجدول', note TEXT DEFAULT '', fee REAL DEFAULT 0)''');
+          await d.execute('CREATE INDEX idx_appt_date ON appointments(date)');
         }));
   }
 
@@ -154,3 +159,25 @@ class LocalStore {
     await d.insert('services', s.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
   }
 }
+
+  Future<List<Appointment>> appointmentsFor(String date) async {
+    final d = await db;
+    final rows = await d.query('appointments',
+        where: 'date = ?', whereArgs: [date], orderBy: 'time ASC');
+    return rows.map(Appointment.fromMap).toList();
+  }
+
+  Future<void> upsertAppointment(Appointment a) async {
+    final d = await db;
+    await d.insert('appointments', a.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> setAppointmentStatus(String id, String status) async {
+    final d = await db;
+    await d.update('appointments', {'status': status}, where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> deleteAppointment(String id) async {
+    final d = await db;
+    await d.delete('appointments', where: 'id = ?', whereArgs: [id]);
+  }

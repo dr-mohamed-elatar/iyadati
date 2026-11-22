@@ -142,3 +142,34 @@ class ClinicProfile {
         open: (m['open'] ?? 1) == 1,
       );
 }
+
+/// موعد في جدول العيادة
+class Appointment {
+  final String id;
+  final String patientId;
+  String patientName;
+  String date; // YYYY-MM-DD
+  String time; // HH:mm (24h)
+  String type; // نوع الزيارة من تخصص العيادة
+  String status; // مجدول | تم | ملغي | لم يحضر
+  String note;
+  double fee;
+
+  Appointment({
+    required this.id, required this.patientId, this.patientName = '',
+    required this.date, required this.time,
+    this.type = '', this.status = 'مجدول', this.note = '', this.fee = 0,
+  });
+
+  Map<String, dynamic> toMap() => {
+        'id': id, 'patient_id': patientId, 'patient_name': patientName,
+        'date': date, 'time': time, 'type': type, 'status': status,
+        'note': note, 'fee': fee,
+      };
+  factory Appointment.fromMap(Map<String, dynamic> m) => Appointment(
+        id: m['id'], patientId: m['patient_id'], patientName: m['patient_name'] ?? '',
+        date: m['date'], time: m['time'], type: m['type'] ?? '',
+        status: m['status'] ?? 'مجدول', note: m['note'] ?? '',
+        fee: (m['fee'] as num?)?.toDouble() ?? 0,
+      );
+}
