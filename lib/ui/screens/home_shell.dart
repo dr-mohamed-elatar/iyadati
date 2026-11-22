@@ -9,6 +9,7 @@ import 'appointments_screen.dart';
 import 'finance_screen.dart';
 import 'patients_screen.dart';
 import 'placeholder_screens.dart';
+import 'settings_screen.dart';
 
 /// الواجهة الرئيسية بعد اختيار التخصص: كل المحتوى بلغة التخصص المختار
 class HomeShell extends StatefulWidget {
@@ -30,7 +31,7 @@ class _HomeShellState extends State<HomeShell> {
       AppointmentsScreen(key: _apptKey),
       const FinanceScreen(),
       PlaceholderScreen(title: 'الفريق والمخزون', icon: Icons.groups, tips: spec.tips),
-      PlaceholderScreen(title: 'النظام', icon: Icons.settings, tips: spec.tips),
+      SettingsScreen(tips: spec.tips),
     ];
     final labels = ['المرضى', 'المواعيد', 'المال', 'الفريق', 'النظام'];
     final icons = [Icons.people, Icons.calendar_month, Icons.payments, Icons.groups, Icons.settings];

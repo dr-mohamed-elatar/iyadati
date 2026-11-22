@@ -6,7 +6,9 @@ import 'config/specialties.dart';
 import 'models/models.dart';
 import 'services/ads_service.dart';
 import 'services/auth_service.dart';
+import 'services/license_service.dart';
 import 'services/local_store.dart';
+import 'ui/screens/activation_screen.dart';
 import 'ui/screens/home_shell.dart';
 import 'ui/screens/registration_screen.dart';
 
@@ -15,12 +17,20 @@ Future<void> main() async {
   await AdsService.init();
   await LocalStore.instance.db;
   final profile = await LocalStore.instance.profile();
-  runApp(IyadatiApp(profile: profile, auth: LocalAuthService()));
+  final lic = LicenseService.instance;
+  final needsActivation = (await lic.devSecret()) != null && (await lic.current()) == null;
+  runApp(IyadatiApp(profile: profile, auth: LocalAuthService(), needsActivation: needsActivation));
 }
 
 class AppState extends ChangeNotifier {
   ClinicProfile profile;
-  AppState(this.profile);
+  bool activated;
+  AppState(this.profile, {this.activated = true});
+
+  void markActivated() {
+    activated = true;
+    notifyListeners();
+  }
 
   Specialty? get specialty => kSpecialties[profile.specKey];
 
@@ -40,12 +50,14 @@ class AppState extends ChangeNotifier {
 class IyadatiApp extends StatelessWidget {
   final ClinicProfile profile;
   final AuthService auth;
-  const IyadatiApp({super.key, required this.profile, required this.auth});
+  final bool needsActivation;
+  const IyadatiApp(
+      {super.key, required this.profile, required this.auth, this.needsActivation = false});
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => AppState(profile),
+      create: (_) => AppState(profile, activated: !needsActivation),
       child: Consumer<AppState>(builder: (ctx, app, __) {
         return MaterialApp(
           title: 'عيادتي',
@@ -63,10 +75,12 @@ class IyadatiApp extends StatelessWidget {
           ),
           home: Directionality(
             textDirection: TextDirection.rtl,
-            // قائمة التخصصات تظهر فقط عند إنشاء الحساب (profile بلا تخصص)
-            child: app.profile.hasSpecialty
-                ? const HomeShell()
-                : RegistrationScreen(auth: auth),
+            // بوابة التفعيل أولًا، ثم التخصص/التسجيل
+            child: !app.activated
+                ? ActivationScreen(onActivated: app.markActivated)
+                : app.profile.hasSpecialty
+                    ? const HomeShell()
+                    : RegistrationScreen(auth: auth),
           ),
         );
       }),

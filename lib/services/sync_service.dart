@@ -20,8 +20,6 @@ class SyncService {
   bool _ready = false;
   String? get userId => _ready ? Supabase.instance.client.auth.currentUser?.id : null;
 
-  static const _tables = ['patients', 'measurements', 'visits', 'appointments', 'services'];
-
   Future<void> init() async {
     if (!SupabaseConfig.enabled || _ready) return;
     await Supabase.initialize(url: SupabaseConfig.url, anonKey: SupabaseConfig.publishableKey);
