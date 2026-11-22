@@ -265,9 +265,15 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
 }
 
 /// ملف المريض: بياناته + قياسات التخصص (بتحقق المدى) + زياراته
-class PatientDetailsScreen extends StatelessWidget {
+class PatientDetailsScreen extends StatefulWidget {
   final String patientId;
   const PatientDetailsScreen({super.key, required this.patientId});
+  @override
+  State<PatientDetailsScreen> createState() => _PatientDetailsScreenState();
+}
+
+class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
+  int _tick = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -275,7 +281,8 @@ class PatientDetailsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('ملف المريض')),
       body: FutureBuilder<Patient?>(
-        future: LocalStore.instance.patientById(patientId),
+        key: ValueKey(_tick),
+        future: LocalStore.instance.patientById(widget.patientId),
         builder: (ctx, snap) {
           final pt = snap.data;
           if (pt == null) return const Center(child: CircularProgressIndicator());
@@ -311,6 +318,34 @@ class PatientDetailsScreen extends StatelessWidget {
                         leading: const Icon(Icons.monitor_heart),
                         title: Text('${m.name}: ${m.value} ${m.unit}'),
                         subtitle: Text(m.date.toIso8601String().substring(0, 10))),
+                ]);
+              },
+            ),
+            const Divider(),
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              const Text('الزيارات:', style: TextStyle(fontWeight: FontWeight.bold)),
+              TextButton.icon(
+                icon: const Icon(Icons.add),
+                label: const Text('زيارة جديدة'),
+                onPressed: () => _addVisit(context, pt, spec),
+              ),
+            ]),
+            FutureBuilder<List<Visit>>(
+              future: LocalStore.instance.visitsOf(pt.id),
+              builder: (ctx, vs) {
+                final list = vs.data ?? [];
+                if (list.isEmpty) return const Text('لا زيارات بعد', style: TextStyle(color: Colors.grey));
+                return Column(children: [
+                  for (final v in list)
+                    ListTile(dense: true,
+                        leading: const Icon(Icons.medical_services),
+                        title: Text(v.type.isEmpty ? 'زيارة' : v.type),
+                        subtitle: Text([
+                          if (v.dx.isNotEmpty) 'تشخيص: ${v.dx}',
+                          if (v.rx.isNotEmpty) 'روشتة: ${v.rx}',
+                          v.at.toIso8601String().substring(0, 10),
+                        ].join('  •  ')),
+                        trailing: v.fee > 0 ? Text('${v.fee.toStringAsFixed(0)} ج') : null),
                 ]);
               },
             ),
@@ -365,10 +400,65 @@ class PatientDetailsScreen extends StatelessWidget {
       await LocalStore.instance.addMeasurement(MeasurementEntry(
           id: const Uuid().v4(), patientId: pt.id, name: chosen!.name, unit: chosen!.unit,
           value: double.parse(normalizeDigits(valueC.text)), date: DateTime.now()));
+      setState(() => _tick++);
       if (context.mounted) {
         Navigator.pushReplacement(context,
             MaterialPageRoute(builder: (_) => PatientDetailsScreen(patientId: pt.id)));
       }
+    }
+  }
+  Future<void> _addVisit(BuildContext context, Patient pt, Specialty spec) async {
+    String type = spec.visits.isNotEmpty ? spec.visits.first : 'كشف';
+    final dxC = TextEditingController();
+    final rxC = TextEditingController();
+    final noteC = TextEditingController();
+    final feeC = TextEditingController(
+        text: context.read<AppState>().profile.fee > 0
+            ? context.read<AppState>().profile.fee.toStringAsFixed(0)
+            : '');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setD) {
+        return AlertDialog(
+          title: const Text('زيارة جديدة'),
+          content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+            DropdownButtonFormField<String>(
+              initialValue: type,
+              decoration: const InputDecoration(labelText: 'نوع الزيارة', border: OutlineInputBorder()),
+              items: spec.visits.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+              onChanged: (v) => setD(() => type = v ?? type),
+            ),
+            const SizedBox(height: 8),
+            TextField(controller: dxC, decoration: const InputDecoration(labelText: 'التشخيص', border: OutlineInputBorder())),
+            const SizedBox(height: 8),
+            TextField(controller: rxC, maxLines: 2, decoration: const InputDecoration(labelText: 'الروشتة', border: OutlineInputBorder())),
+            const SizedBox(height: 8),
+            TextField(controller: noteC, decoration: const InputDecoration(labelText: 'ملاحظات', border: OutlineInputBorder())),
+            const SizedBox(height: 8),
+            TextField(controller: feeC, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'السعر (جنيه)', border: OutlineInputBorder())),
+          ])),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('حفظ')),
+          ],
+        );
+      }),
+    );
+    if (ok == true) {
+      await LocalStore.instance.addVisit(Visit(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        patientId: pt.id,
+        at: DateTime.now(),
+        type: type,
+        dx: dxC.text.trim(),
+        rx: rxC.text.trim(),
+        note: noteC.text.trim(),
+        fee: double.tryParse(feeC.text.trim()) ?? 0,
+      ));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('حُفظت الزيارة')));
+      }
+      setState(() => _tick++);
     }
   }
 }
