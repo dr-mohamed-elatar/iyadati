@@ -18,6 +18,7 @@ class SyncService {
   static final SyncService instance = SyncService._();
 
   bool _ready = false;
+  SupabaseClient get client => Supabase.instance.client;
   String? get userId => _ready ? Supabase.instance.client.auth.currentUser?.id : null;
 
   Future<void> init() async {
@@ -73,6 +74,33 @@ class SyncService {
     final rows = await client.from(table).select().eq('deleted', false);
     for (final r in rows) {
       await apply(Map<String, dynamic>.from(r));
+    }
+  }
+
+  /// سحب ملف العيادة من السحابة إلى التخزين المحلي (بعد الدخول من جهاز جديد)
+  Future<void> pullProfileIntoLocal() async {
+    if (!isActive) return;
+    try {
+      final r = await client
+          .from('clinic_profiles')
+          .select()
+          .eq('user_id', client.auth.currentUser!.id)
+          .maybeSingle();
+      if (r != null) {
+        await LocalStore.instance.saveProfile(ClinicProfile(
+          specKey: r['spec_key'] ?? '',
+          clinicName: r['clinic_name'] ?? '',
+          doctorName: r['doctor_name'] ?? '',
+          address: r['address'] ?? '',
+          phone: r['phone'] ?? '',
+          fee: (r['fee'] as num?)?.toDouble() ?? 0,
+          open: r['open'] ?? true,
+        ));
+      }
+      // وسحب بقية البيانات أيضًا
+      await syncNow();
+    } catch (e) {
+      debugPrint('pull profile failed: $e');
     }
   }
 

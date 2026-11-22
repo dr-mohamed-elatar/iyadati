@@ -7,8 +7,9 @@ import '../../main.dart';
 import '../../models/models.dart';
 import '../../services/auth_service.dart';
 
-/// إنشاء حساب جديد: الاسم + الإيميل + الهاتف ← كود الإيميل ← كود الواتساب
-/// ← اختيار التخصص (يظهر هنا فقط، ولا تظهر القائمة مرة أخرى داخل التطبيق).
+/// دخول أو إنشاء حساب بكود يصل على الإيميل (بدون كلمة سر — الكود هو
+/// طريق الدخول واستعادتها). بعد إنشاء الحساب: اختيار التخصص (يظهر هنا فقط).
+/// توثيق واتساب يتطلب ربط واتساب للأعمال (مدفوع) — يُجمع الرقم ويُوثَّق لاحقًا.
 class RegistrationScreen extends StatefulWidget {
   final AuthService auth;
   const RegistrationScreen({super.key, required this.auth});
@@ -18,21 +19,22 @@ class RegistrationScreen extends StatefulWidget {
 
 class _RegistrationScreenState extends State<RegistrationScreen> {
   int _step = 0;
+  bool _isLogin = false;
   final _form = GlobalKey<FormState>();
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _phone = TextEditingController();
   final _emailCode = TextEditingController();
-  final _waCode = TextEditingController();
   String? _error;
   String? _specKey;
   String _specQuery = '';
 
   Future<void> _start() async {
     if (!(_form.currentState?.validate() ?? false)) return;
-    final r = await widget.auth.startRegistration(
-        name: _name.text, email: _email.text, phone: _phone.text);
-    debugPrint('RESULT ok=${r.ok} err=${r.error}');
+    final r = _isLogin
+        ? await widget.auth.startLogin(_email.text)
+        : await widget.auth.startRegistration(
+            name: _name.text, email: _email.text, phone: _phone.text);
     setState(() {
       if (r.ok) {
         _step = 1;
@@ -45,25 +47,20 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   Future<void> _verifyEmail() async {
     final r = await widget.auth.verifyEmailCode(_emailCode.text);
+    if (!r.ok) {
+      setState(() => _error = r.error);
+      return;
+    }
+    if (_isLogin) {
+      // سحب ملف العيادة من السحابة (تم داخل verifyEmailCode) ثم التحديث
+      if (!mounted) return;
+      final app = context.read<AppState>();
+      await app.reloadProfile();
+      if (app.profile.hasSpecialty) return; // يدخل التطبيق مباشرة
+    }
     setState(() {
-      if (r.ok) {
-        _step = 2;
-        _error = null;
-      } else {
-        _error = r.error;
-      }
-    });
-  }
-
-  Future<void> _verifyWhatsApp() async {
-    final r = await widget.auth.verifyWhatsAppCode(_waCode.text);
-    setState(() {
-      if (r.ok) {
-        _step = 3;
-        _error = null;
-      } else {
-        _error = r.error;
-      }
+      _step = 2;
+      _error = null;
     });
   }
 
@@ -97,9 +94,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             if (_step == 0) _buildInfoStep(),
             if (_step == 1) _buildCodeStep(
                 'كود الإيميل', 'أدخل الكود المكوّن من 6 أرقام الذي وصل بريدك', _emailCode, _verifyEmail),
-            if (_step == 2) _buildCodeStep(
-                'كود الواتساب', 'أدخل الكود الذي وصل واتساب على رقمك', _waCode, _verifyWhatsApp),
-            if (_step == 3) _buildSpecialtyStep(),
+            if (_step == 2) _buildSpecialtyStep(),
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.only(top: 12),
@@ -112,22 +107,34 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     );
   }
 
-  String _stepTitle() => const [
-        'إنشاء حساب جديد — بياناتك',
-        'التحقق من البريد الإلكتروني',
-        'التحقق من رقم الهاتف عبر واتساب',
-        'اختر تخصص عيادتك (اختيار نهائي — لن تظهر هذه القائمة مرة أخرى)',
-      ][_step];
+  String _stepTitle() => _step == 0
+      ? (_isLogin ? 'تسجيل الدخول بكود يصل إيميلك' : 'إنشاء حساب جديد — بياناتك')
+      : const [
+          '',
+          'التحقق من البريد الإلكتروني',
+          'اختر تخصص عيادتك (اختيار نهائي — لن تظهر هذه القائمة مرة أخرى)',
+        ][_step];
 
   Widget _buildInfoStep() {
     return Form(
       key: _form,
       child: Column(children: [
-        TextFormField(
-            controller: _name,
-            decoration: const InputDecoration(labelText: 'اسم الطبيب', border: OutlineInputBorder()),
-            validator: (v) => validatePersonName(v ?? '', label: 'اسم الطبيب')),
-        const SizedBox(height: 12),
+        SegmentedButton<bool>(
+          segments: const [
+            ButtonSegment(value: false, label: Text('حساب جديد')),
+            ButtonSegment(value: true, label: Text('تسجيل الدخول')),
+          ],
+          selected: {_isLogin},
+          onSelectionChanged: (v) => setState(() => _isLogin = v.first),
+        ),
+        const SizedBox(height: 16),
+        if (!_isLogin) ...[
+          TextFormField(
+              controller: _name,
+              decoration: const InputDecoration(labelText: 'اسم الطبيب', border: OutlineInputBorder()),
+              validator: (v) => validatePersonName(v ?? '', label: 'اسم الطبيب')),
+          const SizedBox(height: 12),
+        ],
         TextFormField(
             controller: _email,
             keyboardType: TextInputType.emailAddress,
@@ -137,16 +144,25 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     ? null
                     : 'بريد إلكتروني غير صالح'),
         const SizedBox(height: 12),
-        TextFormField(
+        if (!_isLogin)
+          TextFormField(
             controller: _phone,
             keyboardType: TextInputType.phone,
             decoration: const InputDecoration(
                 labelText: 'رقم الهاتف (واتساب)', hintText: '01xxxxxxxxx',
                 border: OutlineInputBorder()),
-            validator: (v) => validateEgyptianPhone(v ?? '')),
+            validator: (v) => _isLogin ? null : validateEgyptianPhone(v ?? '')),
+        if (!_isLogin)
+          const Padding(
+            padding: EdgeInsets.only(top: 4),
+            child: Text('توثيق رقم الواتساب سيُفعَّل قريبًا عبر واتساب للأعمال',
+                style: TextStyle(color: Colors.grey, fontSize: 12)),
+          ),
         const SizedBox(height: 16),
         FilledButton.icon(
-            icon: const Icon(Icons.send), label: const Text('إرسال كودي التحقق'), onPressed: _start),
+            icon: const Icon(Icons.send),
+            label: Text(_isLogin ? 'إرسال كود الدخول' : 'إرسال كودي التحقق'),
+            onPressed: _start),
       ]),
     );
   }

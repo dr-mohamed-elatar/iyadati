@@ -47,11 +47,8 @@ void main() {
     await tester.tap(find.text('إرسال كودي التحقق'));
     await settleUntil(find.text('تحقق'));
 
-    // كود الإيميل ثم كود الواتساب
+    // كود الإيميل ثم اختيار التخصص
     await tester.enterText(find.byType(TextField).first, auth.devLastEmailCode!);
-    await tester.tap(find.text('تحقق'));
-    await settleUntil(find.text('كود الواتساب'));
-    await tester.enterText(find.byType(TextField).first, auth.devLastWhatsAppCode!);
     await tester.tap(find.text('تحقق'));
     await settleUntil(find.textContaining('اختر تخصص عيادتك'));
 
