@@ -6,6 +6,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart' hide AppState;
 import '../../main.dart';
 import '../../services/ads_service.dart';
 import 'appointments_screen.dart';
+import 'dashboard_screen.dart';
 import 'finance_screen.dart';
 import 'patients_screen.dart';
 import 'placeholder_screens.dart';
@@ -27,14 +28,14 @@ class _HomeShellState extends State<HomeShell> {
     final app = context.watch<AppState>();
     final spec = app.specialty!;
     final screens = [
+      DashboardScreen(onNavigate: (i) => setState(() => _index = i)),
       const PatientsScreen(),
       AppointmentsScreen(key: _apptKey),
       const FinanceScreen(),
-      PlaceholderScreen(title: 'الفريق والمخزون', icon: Icons.groups, tips: spec.tips),
       SettingsScreen(tips: spec.tips),
     ];
-    final labels = ['المرضى', 'المواعيد', 'المال', 'الفريق', 'النظام'];
-    final icons = [Icons.people, Icons.calendar_month, Icons.payments, Icons.groups, Icons.settings];
+    final labels = ['الرئيسية', 'المرضى', 'المواعيد', 'المال', 'النظام'];
+    final icons = [Icons.home, Icons.people, Icons.calendar_month, Icons.payments, Icons.settings];
 
     return Scaffold(
       appBar: AppBar(
@@ -45,7 +46,7 @@ class _HomeShellState extends State<HomeShell> {
         ]),
       ),
       body: screens[_index],
-      floatingActionButton: _index == 1 ? AppointmentsFab(stateKey: _apptKey) : null, // المال له FAB خاص
+      floatingActionButton: _index == 2 ? AppointmentsFab(stateKey: _apptKey) : null, // المال له FAB خاص
       bottomNavigationBar: Column(mainAxisSize: MainAxisSize.min, children: [
         const AdBanner(),
         NavigationBar(

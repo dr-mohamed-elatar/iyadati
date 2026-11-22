@@ -71,9 +71,35 @@ class IyadatiApp extends StatelessWidget {
     return ChangeNotifierProvider(
       create: (_) => AppState(profile, activated: !needsActivation),
       child: Consumer<AppState>(builder: (ctx, app, __) {
+        final scheme = ColorScheme.fromSeed(seedColor: app.themeColor);
         return MaterialApp(
           title: 'عيادتي',
           debugShowCheckedModeBanner: false,
+          theme: ThemeData(
+            useMaterial3: true,
+            colorScheme: scheme,
+            scaffoldBackgroundColor: const Color(0xFFF7F8FA),
+            appBarTheme: AppBarTheme(
+              centerTitle: true,
+              backgroundColor: scheme.primary,
+              foregroundColor: Colors.white,
+            ),
+            cardTheme: CardThemeData(
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+            inputDecorationTheme: InputDecorationTheme(
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              filled: true,
+              fillColor: Colors.white,
+            ),
+            filledButtonTheme: FilledButtonThemeData(
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
           locale: const Locale('ar'),
           supportedLocales: const [Locale('ar')],
           localizationsDelegates: const [
@@ -81,10 +107,6 @@ class IyadatiApp extends StatelessWidget {
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
-          theme: ThemeData(
-            useMaterial3: true,
-            colorScheme: ColorScheme.fromSeed(seedColor: app.themeColor),
-          ),
           home: Directionality(
             textDirection: TextDirection.rtl,
             // بوابة التفعيل أولًا، ثم التخصص/التسجيل

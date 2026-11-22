@@ -67,6 +67,9 @@ void main() {
     // التطبيق أصبح عيادة عيون
     expect(find.text('عيادة عيون'), findsOneWidget);
     expect(find.textContaining('اختر تخصص'), findsNothing);
+    // استنزاف أي مؤقتات متبقية (جلب بيانات لوحة اليوم)
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 500)));
+    await tester.pump();
   });
 
   testWidgets('نموذج مريض جديد يعرض حقول تخصص العيون تلقائيًا', (tester) async {
