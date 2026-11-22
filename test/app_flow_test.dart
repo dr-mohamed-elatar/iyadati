@@ -127,6 +127,8 @@ void main() {
   });
 
   test('المال: ملخص اليوم يجمع رسوم المواعيد المكتملة فقط', () async {
+    final db = await LocalStore.instance.db;
+    await db.delete('appointments');
     final now = DateTime.now();
     final d =
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
