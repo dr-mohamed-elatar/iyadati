@@ -92,8 +92,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 style: const TextStyle(color: Colors.grey)),
             const SizedBox(height: 20),
             if (_step == 0) _buildInfoStep(),
-            if (_step == 1) _buildCodeStep(
-                'كود الإيميل', 'أدخل الكود المكوّن من 6 أرقام الذي وصل بريدك', _emailCode, _verifyEmail),
+            if (_step == 1) _buildEmailConfirmStep(),
             if (_step == 2) _buildSpecialtyStep(),
             if (_error != null)
               Padding(
@@ -161,10 +160,44 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         const SizedBox(height: 16),
         FilledButton.icon(
             icon: const Icon(Icons.send),
-            label: Text(_isLogin ? 'إرسال كود الدخول' : 'إرسال كودي التحقق'),
+            label: Text(_isLogin ? 'إرسال رابط الدخول' : 'إرسال رابط التحقق'),
             onPressed: _start),
       ]),
     );
+  }
+
+  /// خطوة تأكيد البريد: الأساس هو رابط التأكيد في الإيميل (يعود للتطبيق
+  /// ويسجّل الدخول تلقائيًا)، مع إدخال كود يدويًا كاحتياطي.
+  Widget _buildEmailConfirmStep() {
+    return Column(children: [
+      const Icon(Icons.mark_email_read_outlined, size: 48, color: Colors.teal),
+      const SizedBox(height: 12),
+      const Text(
+          'أرسلنا رابط تأكيد إلى بريدك. افتح البريد واضغط الرابط، ثم ارجع هنا واضغط «تم التأكيد».',
+          textAlign: TextAlign.center),
+      const SizedBox(height: 16),
+      FilledButton.icon(
+          icon: const Icon(Icons.verified),
+          label: const Text('تم التأكيد'),
+          onPressed: _verifyEmail),
+      const SizedBox(height: 20),
+      const Divider(),
+      const Text('أو أدخل الكود من البريد (إن وُجد):',
+          style: TextStyle(color: Colors.grey, fontSize: 12)),
+      const SizedBox(height: 8),
+      TextField(
+          controller: _emailCode,
+          keyboardType: TextInputType.number,
+          textAlign: TextAlign.center,
+          maxLength: 6,
+          style: const TextStyle(fontSize: 20, letterSpacing: 6),
+          decoration:
+              const InputDecoration(labelText: 'كود الإيميل', border: OutlineInputBorder())),
+      TextButton.icon(
+          icon: const Icon(Icons.check),
+          label: const Text('تحقق بالكود'),
+          onPressed: _verifyEmail),
+    ]);
   }
 
   Widget _buildCodeStep(

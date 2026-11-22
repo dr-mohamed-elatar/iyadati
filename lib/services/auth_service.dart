@@ -55,7 +55,10 @@ class SupabaseAuthService implements AuthService {
 
   Future<AuthResult> _sendOtp(String email) async {
     try {
-      await SyncService.instance.client.auth.signInWithOtp(email: email);
+      // الرابط في البريد يعود إلى تطبيق الويب المنشور (Site URL في لوحة Supabase)
+      await SyncService.instance.client.auth.signInWithOtp(
+          email: email,
+          emailRedirectTo: 'https://dr-mohamed-elatar.github.io/iyadati/');
       return const AuthResult.ok();
     } catch (e) {
       return AuthResult.fail('تعذر إرسال الكود: $e');
@@ -66,7 +69,14 @@ class SupabaseAuthService implements AuthService {
   Future<AuthResult> verifyEmailCode(String code) async {
     await _ensureInit();
     final email = _pendingEmail ?? await LocalStore.instance.getKv('pending_email');
+    // تدفق الرابط: عند العودة من البريد تكون الجلسة فعّالة أصلًا (بدون كود)
+    if (SyncService.instance.client.auth.currentSession != null) {
+      await LocalStore.instance.setKv('account_verified', '1');
+      await SyncService.instance.pullProfileIntoLocal();
+      return const AuthResult.ok();
+    }
     if (email == null) return const AuthResult.fail('اطلب الكود أولًا');
+    if (code.trim().isEmpty) return const AuthResult.fail('افتح بريدك واضغط رابط التأكيد');
     try {
       // ignore: deprecated_member_use
       await SyncService.instance.client.auth

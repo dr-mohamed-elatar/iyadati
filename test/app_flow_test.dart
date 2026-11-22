@@ -44,12 +44,12 @@ void main() {
     await tester.enterText(find.byType(TextFormField).at(0), 'دكتور أحمد');
     await tester.enterText(find.byType(TextFormField).at(1), 'doc@test.com');
     await tester.enterText(find.byType(TextFormField).at(2), '01012345678');
-    await tester.tap(find.text('إرسال كودي التحقق'));
-    await settleUntil(find.text('تحقق'));
+    await tester.tap(find.text('إرسال رابط التحقق'));
+    await settleUntil(find.text('تحقق بالكود'));
 
     // كود الإيميل ثم اختيار التخصص
     await tester.enterText(find.byType(TextField).first, auth.devLastEmailCode!);
-    await tester.tap(find.text('تحقق'));
+    await tester.tap(find.text('تحقق بالكود'));
     await settleUntil(find.textContaining('اختر تخصص عيادتك'));
 
     // قائمة التخصصات تظهر (مرة واحدة هنا فقط)
