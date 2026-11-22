@@ -1,4 +1,4 @@
-import 'package:supabase_flutter/supabase_flutter.dart' show OtpType;
+
 
 import 'local_store.dart';
 import 'sync_service.dart';
@@ -11,82 +11,95 @@ class AuthResult {
   const AuthResult.fail(this.error) : ok = false;
 }
 
-/// واجهة الدخول والتسجيل بكود يصل على الإيميل (بدون كلمة سر — الكود هو
-/// طريق الدخول واستعادتها). التنفيذ السحابي Supabase، والمحلي للاختبار.
+/// واجهة الدخول والتسجيل: بريد + كلمة سر (تأكيد البريد معطّل في Supabase —
+/// لا إيميلات ولا حدود إرسال). استعادة كلمة السر برابط إيميل عند توفره.
 abstract class AuthService {
-  /// إنشاء حساب: يرسل كود الإيميل. (واتساب يُجمع رقمه ويُوثَّق لاحقًا)
-  Future<AuthResult> startRegistration(
-      {required String name, required String email, required String phone});
+  /// إنشاء حساب: بريد + كلمة سر، يدخل مباشرة بدون تأكيد.
+  Future<AuthResult> register(
+      {required String name,
+      required String email,
+      required String phone,
+      required String password});
 
-  /// دخول: يرسل كود الإيميل لحساب موجود
-  Future<AuthResult> startLogin(String email);
+  /// دخول: بريد + كلمة سر لحساب موجود
+  Future<AuthResult> login({required String email, required String password});
 
-  Future<AuthResult> verifyEmailCode(String code);
+  /// إرسال رابط استعادة كلمة السر (يتطلب بريدًا مفعّلًا في Supabase)
+  Future<AuthResult> resetPassword(String email);
+
   Future<AuthResult> verifyWhatsAppCode(String code);
   Future<bool> get hasAccount;
   Future<void> signOut();
 }
 
-/// تنفيذ سحابي: Supabase Auth بكود إيميل (OTP).
-class SupabaseAuthService implements AuthService {
-  String? _pendingEmail;
+String _friendlyAuthError(Object e) {
+  final m = e.toString();
+  if (m.contains('over_email_send_rate_limit') || m.contains('429')) {
+    return 'تم إرسال عدد كبير من الرسائل — انتظر ساعة وحاول مجددًا';
+  }
+  if (m.contains('Invalid login credentials')) {
+    return 'البريد أو كلمة السر غير صحيحة';
+  }
+  if (m.contains('User already registered')) {
+    return 'هذا البريد مسجّل بالفعل — جرّب تسجيل الدخول';
+  }
+  if (m.contains('Password should be')) {
+    return 'كلمة السر قصيرة — 6 أحرف على الأقل';
+  }
+  return 'تعذّر الاتصال بالخادم — تحقق من الإنترنت وحاول مجددًا';
+}
 
+/// تنفيذ سحابي: Supabase Auth ببريد + كلمة سر.
+class SupabaseAuthService implements AuthService {
   Future<void> _ensureInit() async {
     await SyncService.instance.init();
   }
 
   @override
-  Future<AuthResult> startRegistration(
-      {required String name, required String email, required String phone}) async {
+  Future<AuthResult> register(
+      {required String name,
+      required String email,
+      required String phone,
+      required String password}) async {
     await _ensureInit();
-    _pendingEmail = email.trim();
-    await LocalStore.instance.setKv('pending_name', name.trim());
-    await LocalStore.instance.setKv('pending_email', _pendingEmail!);
-    await LocalStore.instance.setKv('pending_phone', phone.trim());
-    return _sendOtp(_pendingEmail!);
-  }
-
-  @override
-  Future<AuthResult> startLogin(String email) async {
-    await _ensureInit();
-    _pendingEmail = email.trim();
-    return _sendOtp(_pendingEmail!);
-  }
-
-  Future<AuthResult> _sendOtp(String email) async {
     try {
-      // الرابط في البريد يعود إلى تطبيق الويب المنشور (Site URL في لوحة Supabase)
-      await SyncService.instance.client.auth.signInWithOtp(
-          email: email,
-          emailRedirectTo: 'https://dr-mohamed-elatar.github.io/iyadati/');
+      await SyncService.instance.client.auth.signUp(
+          email: email.trim(), password: password,
+          data: {'name': name.trim(), 'phone': phone.trim()});
+      await LocalStore.instance.setKv('pending_name', name.trim());
+      await LocalStore.instance.setKv('pending_email', email.trim());
+      await LocalStore.instance.setKv('pending_phone', phone.trim());
+      await LocalStore.instance.setKv('account_verified', '1');
       return const AuthResult.ok();
     } catch (e) {
-      return AuthResult.fail('تعذر إرسال الكود: $e');
+      return AuthResult.fail(_friendlyAuthError(e));
     }
   }
 
   @override
-  Future<AuthResult> verifyEmailCode(String code) async {
+  Future<AuthResult> login({required String email, required String password}) async {
     await _ensureInit();
-    final email = _pendingEmail ?? await LocalStore.instance.getKv('pending_email');
-    // تدفق الرابط: عند العودة من البريد تكون الجلسة فعّالة أصلًا (بدون كود)
-    if (SyncService.instance.client.auth.currentSession != null) {
-      await LocalStore.instance.setKv('account_verified', '1');
-      await SyncService.instance.pullProfileIntoLocal();
-      return const AuthResult.ok();
-    }
-    if (email == null) return const AuthResult.fail('اطلب الكود أولًا');
-    if (code.trim().isEmpty) return const AuthResult.fail('افتح بريدك واضغط رابط التأكيد');
     try {
-      // ignore: deprecated_member_use
       await SyncService.instance.client.auth
-          .verifyOTP(type: OtpType.email, token: code.trim(), email: email);
+          .signInWithPassword(email: email.trim(), password: password);
       await LocalStore.instance.setKv('account_verified', '1');
       // سحب ملف العيادة إن وُجد (جهاز جديد لنفس الحساب)
       await SyncService.instance.pullProfileIntoLocal();
       return const AuthResult.ok();
     } catch (e) {
-      return AuthResult.fail('الكود غير صحيح أو منتهي');
+      return AuthResult.fail(_friendlyAuthError(e));
+    }
+  }
+
+  @override
+  Future<AuthResult> resetPassword(String email) async {
+    await _ensureInit();
+    try {
+      await SyncService.instance.client.auth.resetPasswordForEmail(email.trim(),
+          redirectTo: 'https://dr-mohamed-elatar.github.io/iyadati/');
+      return const AuthResult.ok();
+    } catch (e) {
+      return AuthResult.fail(_friendlyAuthError(e));
     }
   }
 
@@ -109,54 +122,34 @@ class SupabaseAuthService implements AuthService {
   }
 }
 
-/// تنفيذ محلي كامل (وضع بلا سيرفر): يولّد الأكواد ويخزنها محليًا للاختبار.
+/// تنفيذ محلي كامل (وضع بلا سيرفر): يقبل أي كلمة سر ويخزن محليًا للاختبار.
 class LocalAuthService implements AuthService {
-  String? _pendingEmailCode;
-  String? _pendingWhatsAppCode;
-  String? _pendingEmail;
-  String? _pendingPhone;
-
-  /// للاختبار فقط: الكود المولّد آخر مرة (لا يُعرض للمستخدم النهائي)
-  String? get devLastEmailCode => _pendingEmailCode;
-  String? get devLastWhatsAppCode => _pendingWhatsAppCode;
-
-  String _code() => (100000 + (DateTime.now().microsecondsSinceEpoch % 900000)).toString();
-
   @override
-  Future<AuthResult> startRegistration(
-      {required String name, required String email, required String phone}) async {
-    _pendingEmailCode = _code();
-    _pendingWhatsAppCode = _code();
-    _pendingEmail = email.trim();
-    _pendingPhone = phone.trim();
+  Future<AuthResult> register(
+      {required String name,
+      required String email,
+      required String phone,
+      required String password}) async {
     await LocalStore.instance.setKv('pending_name', name.trim());
-    await LocalStore.instance.setKv('pending_email', _pendingEmail!);
-    await LocalStore.instance.setKv('pending_phone', _pendingPhone!);
+    await LocalStore.instance.setKv('pending_email', email.trim());
+    await LocalStore.instance.setKv('pending_phone', phone.trim());
+    await LocalStore.instance.setKv('account_verified', '1');
     return const AuthResult.ok();
   }
 
   @override
-  Future<AuthResult> startLogin(String email) async {
-    _pendingEmailCode = _code();
-    _pendingEmail = email.trim();
+  Future<AuthResult> login({required String email, required String password}) async {
+    await LocalStore.instance.setKv('account_verified', '1');
     return const AuthResult.ok();
   }
 
   @override
-  Future<AuthResult> verifyEmailCode(String code) async {
-    if (_pendingEmailCode != null && code.trim() == _pendingEmailCode) {
-      return const AuthResult.ok();
-    }
-    return const AuthResult.fail('كود الإيميل غير صحيح');
-  }
+  Future<AuthResult> resetPassword(String email) async => const AuthResult.ok();
 
   @override
   Future<AuthResult> verifyWhatsAppCode(String code) async {
-    if (_pendingWhatsAppCode != null && code.trim() == _pendingWhatsAppCode) {
-      await LocalStore.instance.setKv('account_verified', '1');
-      return const AuthResult.ok();
-    }
-    return const AuthResult.fail('كود الواتساب غير صحيح');
+    await LocalStore.instance.setKv('account_verified', '1');
+    return const AuthResult.ok();
   }
 
   @override

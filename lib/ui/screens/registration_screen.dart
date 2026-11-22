@@ -7,8 +7,8 @@ import '../../main.dart';
 import '../../models/models.dart';
 import '../../services/auth_service.dart';
 
-/// دخول أو إنشاء حساب بكود يصل على الإيميل (بدون كلمة سر — الكود هو
-/// طريق الدخول واستعادتها). بعد إنشاء الحساب: اختيار التخصص (يظهر هنا فقط).
+/// دخول أو إنشاء حساب: بريد + كلمة سر (بدون تأكيد بريد — دخول مباشر).
+/// بعد إنشاء الحساب: اختيار التخصص (يظهر هنا فقط).
 /// توثيق واتساب يتطلب ربط واتساب للأعمال (مدفوع) — يُجمع الرقم ويُوثَّق لاحقًا.
 class RegistrationScreen extends StatefulWidget {
   final AuthService auth;
@@ -24,7 +24,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _phone = TextEditingController();
-  final _emailCode = TextEditingController();
+  final _password = TextEditingController();
   String? _error;
   String? _specKey;
   String _specQuery = '';
@@ -32,27 +32,18 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   Future<void> _start() async {
     if (!(_form.currentState?.validate() ?? false)) return;
     final r = _isLogin
-        ? await widget.auth.startLogin(_email.text)
-        : await widget.auth.startRegistration(
-            name: _name.text, email: _email.text, phone: _phone.text);
-    setState(() {
-      if (r.ok) {
-        _step = 1;
-        _error = null;
-      } else {
-        _error = r.error;
-      }
-    });
-  }
-
-  Future<void> _verifyEmail() async {
-    final r = await widget.auth.verifyEmailCode(_emailCode.text);
+        ? await widget.auth.login(email: _email.text, password: _password.text)
+        : await widget.auth.register(
+            name: _name.text,
+            email: _email.text,
+            phone: _phone.text,
+            password: _password.text);
     if (!r.ok) {
       setState(() => _error = r.error);
       return;
     }
     if (_isLogin) {
-      // سحب ملف العيادة من السحابة (تم داخل verifyEmailCode) ثم التحديث
+      // سحب ملف العيادة من السحابة (تم داخل login) ثم التحديث
       if (!mounted) return;
       final app = context.read<AppState>();
       await app.reloadProfile();
@@ -62,6 +53,17 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       _step = 2;
       _error = null;
     });
+  }
+
+  Future<void> _forgotPassword() async {
+    final email = _email.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      setState(() => _error = 'أدخل بريدك أولًا ثم اضغط نسيت كلمة السر');
+      return;
+    }
+    final r = await widget.auth.resetPassword(email);
+    setState(() => _error =
+        r.ok ? 'أرسلنا رابط إعادة التعيين إلى بريدك إن كان مسجّلًا' : r.error);
   }
 
   Future<void> _finish() async {
@@ -92,7 +94,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 style: const TextStyle(color: Colors.grey)),
             const SizedBox(height: 20),
             if (_step == 0) _buildInfoStep(),
-            if (_step == 1) _buildEmailConfirmStep(),
             if (_step == 2) _buildSpecialtyStep(),
             if (_error != null)
               Padding(
@@ -157,63 +158,28 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             child: Text('توثيق رقم الواتساب سيُفعَّل قريبًا عبر واتساب للأعمال',
                 style: TextStyle(color: Colors.grey, fontSize: 12)),
           ),
+        const SizedBox(height: 12),
+        TextFormField(
+            controller: _password,
+            obscureText: true,
+            decoration: const InputDecoration(
+                labelText: 'كلمة السر', border: OutlineInputBorder()),
+            validator: (v) =>
+                (v != null && v.length >= 6) ? null : 'كلمة السر: 6 أحرف على الأقل'),
+        if (_isLogin)
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton(
+                onPressed: _forgotPassword,
+                child: const Text('نسيت كلمة السر؟')),
+          ),
         const SizedBox(height: 16),
         FilledButton.icon(
-            icon: const Icon(Icons.send),
-            label: Text(_isLogin ? 'إرسال رابط الدخول' : 'إرسال رابط التحقق'),
+            icon: Icon(_isLogin ? Icons.login : Icons.person_add),
+            label: Text(_isLogin ? 'تسجيل الدخول' : 'إنشاء الحساب'),
             onPressed: _start),
       ]),
     );
-  }
-
-  /// خطوة تأكيد البريد: الأساس هو رابط التأكيد في الإيميل (يعود للتطبيق
-  /// ويسجّل الدخول تلقائيًا)، مع إدخال كود يدويًا كاحتياطي.
-  Widget _buildEmailConfirmStep() {
-    return Column(children: [
-      const Icon(Icons.mark_email_read_outlined, size: 48, color: Colors.teal),
-      const SizedBox(height: 12),
-      const Text(
-          'أرسلنا رابط تأكيد إلى بريدك. افتح البريد واضغط الرابط، ثم ارجع هنا واضغط «تم التأكيد».',
-          textAlign: TextAlign.center),
-      const SizedBox(height: 16),
-      FilledButton.icon(
-          icon: const Icon(Icons.verified),
-          label: const Text('تم التأكيد'),
-          onPressed: _verifyEmail),
-      const SizedBox(height: 20),
-      const Divider(),
-      const Text('أو أدخل الكود من البريد (إن وُجد):',
-          style: TextStyle(color: Colors.grey, fontSize: 12)),
-      const SizedBox(height: 8),
-      TextField(
-          controller: _emailCode,
-          keyboardType: TextInputType.number,
-          textAlign: TextAlign.center,
-          maxLength: 6,
-          style: const TextStyle(fontSize: 20, letterSpacing: 6),
-          decoration:
-              const InputDecoration(labelText: 'كود الإيميل', border: OutlineInputBorder())),
-      TextButton.icon(
-          icon: const Icon(Icons.check),
-          label: const Text('تحقق بالكود'),
-          onPressed: _verifyEmail),
-    ]);
-  }
-
-  Widget _buildCodeStep(
-      String label, String hint, TextEditingController c, Future<void> Function() onVerify) {
-    return Column(children: [
-      Text(hint, textAlign: TextAlign.center),
-      const SizedBox(height: 12),
-      TextField(
-          controller: c,
-          keyboardType: TextInputType.number,
-          textAlign: TextAlign.center,
-          maxLength: 6,
-          style: const TextStyle(fontSize: 24, letterSpacing: 8),
-          decoration: InputDecoration(labelText: label, border: const OutlineInputBorder())),
-      FilledButton.icon(icon: const Icon(Icons.verified), label: const Text('تحقق'), onPressed: onVerify),
-    ]);
   }
 
   Widget _buildSpecialtyStep() {
