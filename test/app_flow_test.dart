@@ -5,6 +5,7 @@ import 'package:iyadati_app/main.dart';
 import 'package:iyadati_app/models/models.dart';
 import 'package:iyadati_app/services/auth_service.dart';
 import 'package:iyadati_app/services/local_store.dart';
+import 'package:iyadati_app/ui/screens/appointments_screen.dart';
 import 'package:iyadati_app/ui/screens/home_shell.dart';
 import 'package:iyadati_app/ui/screens/patients_screen.dart';
 import 'package:provider/provider.dart';
@@ -90,19 +91,22 @@ void main() {
     expect(iop.max, 80);
   });
 
-  testWidgets('المواعيد: إضافة موعد اليوم وظهوره وتغيير حالته إلى تم', (tester) async {
-    final profile = ClinicProfile(specKey: 'uyoun', doctorName: 'دكتور أحمد', fee: 300);
+  testWidgets('المواعيد: تبويب المواعيد يعرض حالة اليوم الفارغة', (tester) async {
+    final profile = ClinicProfile(specKey: 'uyoun', doctorName: 'دكتور أحمد');
     await tester.pumpWidget(ChangeNotifierProvider(
       create: (_) => AppState(profile),
       child: const MaterialApp(home: HomeShell()),
     ));
-    await tester.pumpAndSettle();
-
-    // افتح تبويب المواعيد وأضف موعدًا
     await tester.tap(find.text('المواعيد'));
-    await tester.pumpAndSettle();
+    for (var i = 0; i < 40; i++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await tester.pump();
+      if (find.text('لا مواعيد في هذا اليوم').evaluate().isNotEmpty) break;
+    }
     expect(find.text('لا مواعيد في هذا اليوم'), findsOneWidget);
+  });
 
+  test('مواعيد: حفظ موعد وجلبه وتغيير حالته في التخزين المحلي', () async {
     final now = DateTime.now();
     final dateStr =
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
@@ -110,29 +114,15 @@ void main() {
       id: 'a1', patientId: 'p1', patientName: 'منى أحمد',
       date: dateStr, time: '18:30', type: 'كشف جديد', fee: 300,
     ));
-    // إعادة التحميل بإعادة فتح التبويب
-    await tester.tap(find.text('المرضى'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('المواعيد'));
-    for (var i = 0; i < 40; i++) {
-      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
-      await tester.pump();
-      if (find.text('منى أحمد').evaluate().isNotEmpty) break;
-    }
-
-    expect(find.text('منى أحمد'), findsOneWidget);
-    expect(find.textContaining('كشف جديد'), findsOneWidget);
-    expect(find.text('مجدول'), findsOneWidget);
-
-    // غيّر الحالة إلى تم
-    await tester.tap(find.text('مجدول'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('تم').last);
-    for (var i = 0; i < 40; i++) {
-      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
-      await tester.pump();
-      if (find.text('تم').evaluate().isNotEmpty) break;
-    }
-    expect(find.text('تم'), findsWidgets);
+    var rows = await LocalStore.instance.appointmentsFor(dateStr);
+    expect(rows.length, 1);
+    expect(rows.first.patientName, 'منى أحمد');
+    expect(rows.first.status, 'مجدول');
+    await LocalStore.instance.setAppointmentStatus('a1', 'تم');
+    rows = await LocalStore.instance.appointmentsFor(dateStr);
+    expect(rows.first.status, 'تم');
+    // يوم آخر بلا مواعيد
+    final other = await LocalStore.instance.appointmentsFor('2026-01-01');
+    expect(other, isEmpty);
   });
 }

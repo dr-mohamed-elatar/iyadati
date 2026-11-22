@@ -24,10 +24,10 @@ class AppointmentsScreenState extends State<AppointmentsScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    reload();
   }
 
-  Future<void> _load() async {
+  Future<void> reload() async {
     final rows = await LocalStore.instance.appointmentsFor(_fmt(_day));
     if (mounted) setState(() { _items = rows; _loading = false; });
   }
@@ -103,12 +103,12 @@ class AppointmentsScreenState extends State<AppointmentsScreen> {
       fee: double.tryParse(feeCtrl.text.trim()) ?? 0,
     );
     await LocalStore.instance.upsertAppointment(a);
-    await _load();
+    await reload();
   }
 
   Future<void> _setStatus(Appointment a, String status) async {
     await LocalStore.instance.setAppointmentStatus(a.id, status);
-    await _load();
+    await reload();
   }
 
   Color _statusColor(String s) => switch (s) {
@@ -125,12 +125,12 @@ class AppointmentsScreenState extends State<AppointmentsScreen> {
         padding: const EdgeInsets.all(8),
         child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
           IconButton(icon: const Icon(Icons.chevron_right),
-              onPressed: () { setState(() { _day = _day.subtract(const Duration(days: 1)); _loading = true; }); _load(); }),
+              onPressed: () { setState(() { _day = _day.subtract(const Duration(days: 1)); _loading = true; }); reload(); }),
           Text(_fmt(_day), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           IconButton(icon: const Icon(Icons.chevron_left),
-              onPressed: () { setState(() { _day = _day.add(const Duration(days: 1)); _loading = true; }); _load(); }),
+              onPressed: () { setState(() { _day = _day.add(const Duration(days: 1)); _loading = true; }); reload(); }),
           TextButton(
-              onPressed: () { setState(() { _day = DateTime.now(); _loading = true; }); _load(); },
+              onPressed: () { setState(() { _day = DateTime.now(); _loading = true; }); reload(); },
               child: const Text('اليوم')),
         ]),
       ),
