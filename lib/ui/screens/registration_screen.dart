@@ -108,11 +108,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   }
 
   String _stepTitle() => _step == 0
-      ? (_isLogin ? 'تسجيل الدخول بكود يصل إيميلك' : 'إنشاء حساب جديد — بياناتك')
+      ? (_isLogin ? 'تسجيل الدخول بالبريد الإلكتروني وكلمة السر' : 'إنشاء حساب جديد: بياناتك')
       : const [
           '',
           'التحقق من البريد الإلكتروني',
-          'اختر تخصص عيادتك (اختيار نهائي — لن تظهر هذه القائمة مرة أخرى)',
+          'اختر تخصص عيادتك (اختيار نهائي: لن تظهر هذه القائمة مرة أخرى)',
         ][_step];
 
   Widget _buildInfoStep() {
@@ -155,7 +155,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         if (!_isLogin)
           const Padding(
             padding: EdgeInsets.only(top: 4),
-            child: Text('توثيق رقم الواتساب سيُفعَّل قريبًا عبر واتساب للأعمال',
+            child: Text('توثيق واتساب غير مفعّل حاليًا',
                 style: TextStyle(color: Colors.grey, fontSize: 12)),
           ),
         const SizedBox(height: 12),
